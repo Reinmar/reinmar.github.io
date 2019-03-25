@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Sample spreadsheet app – WarsawJS Workshop #30 – JavaScript runtime preformance</title>
+	<style>
+
+body {
+	padding: 0;
+	margin: 0;
+	overflow: hidden;
+
+	background: #000;
+}
+
+.status-bar {
+	position: relative;
+	box-sizing: border-box;
+	height: 50px;
+
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+
+	background: #DB3;
+	border-bottom: solid 2px #A82;
+	z-index: 1;
+}
+
+.status-bar h1 {
+	margin: 0 0 0 20px;
+	font-size: 30px;
+}
+
+.status-bar__current-cell {
+	width: 20%;
+	text-align: right;
+	margin-right: 20px;
+}
+
+.container {
+	position: absolute;
+	width: 100%;
+	height: calc( 100% - 50px );
+	padding: 0;
+	margin: 0;
+
+	overflow: scroll;
+
+	/* Not sure why it breaks the scrolling */
+	/* contain: layout; */
+}
+
+.row {
+	position: absolute;
+	width: 100%;
+
+	/* Totally deoptimises it... */
+	/* will-change: transform; */
+
+	/* Not sure why it breaks the scrolling */
+	/* contain: layout; */
+}
+
+.cell {
+	position: absolute;
+	box-sizing: border-box;
+	padding: 5px;
+
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+
+	background: white;
+
+	/* Totally deoptimises it... */
+	/* will-change: transform; */
+	/* contain: layout; */
+}
+
+.cell.selected {
+	background: #68F;
+}
+
+/* Hide excessive columns to not affect painting too much. See DISPLAY_COLUMNS2. */
+.cell:nth-child(n+38) {
+	display: none;
+}
+
+.row[data-row="0"] .cell {
+	background: #CCC;
+}
+
+	</style>
+</head>
+<body>
+	<div class="status-bar">
+		<h1>
+			<a href="https://youtu.be/NC_Bev1TTM4?t=22">Toby, the spreadsheet</a>
+			<span style="font-size: 50%">
+				(<a href="https://github.com/Reinmar/warsawjs-workshop-30-spreadsheet">source code</a>,
+				<a href="https://reinmar.github.io/warsawjs-workshop-30-slides">slides</a>)
+			</span>
+		</h1>
+		<div class="status-bar__actions">
+			<button onclick="initToby()">Init</button>
+			<button onclick="destroyToby()">Destroy</button>
+		</div>
+		<div class="status-bar__current-cell"></div>
+	</div>
+	<div class="container"></div>
+	<script src="dist/index.js"></script>
+</body>
+</html>

@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<title>JavaScript runtime performance – WarsawJS Workshop #30</title>
+
+		<link rel="stylesheet" href="css/reveal.css">
+		<link rel="stylesheet" href="css/theme/white.css">
+
+		<!-- Theme used for syntax highlighting of code -->
+		<link rel="stylesheet" href="lib/css/monokai-sublime.css">
+
+		<!-- Printing and PDF exports -->
+		<script>
+			var link = document.createElement( 'link' );
+			link.rel = 'stylesheet';
+			link.type = 'text/css';
+			link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+			document.getElementsByTagName( 'head' )[ 0 ].appendChild( link );
+		</script>
+
+		<style>
+			.reveal h1, .reveal h2, .reveal h3, .reveal h4, .reveal h5, .reveal h6 {
+				/* People should go to jail for changing this */
+				text-transform: initial;
+			}
+
+			.reveal h1 {
+				font-size: 2em;
+			}
+
+			.reveal h2 {
+				font-size: 1.3em;
+			}
+
+			.show-notes-inline .reveal aside.notes {
+				font-size: 50%;
+				display: block;
+				position: fixed;
+				bottom: 0;
+				left: 15%;
+				width: 70%;
+				background: rgba( 255, 255, 255, 0.95 );
+				font-style: italic;
+				padding: 1em;
+			}
+
+			code {
+				tab-size: 4;
+			}
+
+			.reveal .intro h1 {
+				font-size: 1em;
+			}
+			.reveal .intro .trainer {
+				padding-bottom: 3em;
+			}
+			.reveal .intro img {
+				border: none;
+				width: 20%;
+				border-radius: 50%;
+			}
+			.reveal .intro .practical-info {
+				position: absolute;
+				bottom: 0;
+				left: 0;
+				font-size: 0.4em;
+				text-align: left;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+
+<section class="intro">
+	<h1>Grupa 1.</h1>
+	<p class="trainer">
+		<img src="./images/piotr-koszulinski.jpg" alt="Piotrek Koszuliński's photo"><br>
+		Piotrek Koszuliński<br>
+		<a href="https://twitter.com/reinmarpl">@reinmarpl</a>
+	</p>
+	<p class="practical-info">
+		slack: #workshop-30-1<br>
+		GH: <a href="https://github.com/Reinmar/warsawjs-workshop-30-spreadsheet">github.com/Reinmar/warsawjs-workshop-30-spreadsheet</a>
+	</p>
+</section>
+
+<section>
+	<h1>Good morning, everyone!<br>👋</h1>
+
+	<aside class="notes">
+		<ul>
+			<li>who am I? started my career as a FE around 2007, then I joined CKE as a JS dev so for the last 7 years I'm doing only JS.</li>
+			<li>now I'm CKE project lead and don't do much coding myself.</li>
+			<li>that's about me</li>
+			<li>tell us a bit about yourself (experience? FE/JS? expectations?)</li>
+			<li>framework vs vanilla JS?</li>
+			<li>experience with profiling apps, memory leaks, GC, rendering, etc.?</li>
+			<li>did you hear about CKE before the workshop?</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Agenda</h1>
+
+	<ol style="font-size: 90%">
+		<li>Optimizing
+			<ul>
+				<li>When?</li>
+				<li>What?</li>
+				<li>How?</li>
+			</ul>
+		</li>
+		<li>Memory leaks</li>
+		<li>Let's fix Toby's memory leaks!</li>
+		<li>
+			Runtime performance
+			<ol>
+				<li>Know your enemy</li>
+				<li>Common issues</li>
+				<li>Common techniques</li>
+			</ol>
+		</li>
+		<li>Let's improve Toby's performance!</li>
+	</ol>
+
+	<aside class="notes">
+		<ul>
+			<li>some theory first</li>
+			<li>in both cases, I'll first showcase the tools and then you'll play with them</li>
+			<li>when should you optimize?</li>
+			<li>what should you optimize?</li>
+			<li>How should you optimize?</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Stop me at any time! 🔇</h1>
+
+	<aside class="notes">
+		<ul>
+			<li>ask me questions</li>
+			<li>fix my mistakes</li>
+			<li>ask me to slow down</li>
+			<li>sorry for literally zero pictures (one, if we include my face), I used all my time on Toby</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Runtime performance</h1>
+
+	<ul>
+		<li class="fragment">Load time and Run<span style="background: rgba(255,50,50,0.4); display:inline-block; width:1ex">&nbsp;</span>time </li>
+		<li class="fragment">Common aspects</li>
+		<li class="fragment">But this will be about runtime performance</li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li>load time – initial UX, engagement, conversion, inclusiveness, SEO, etc.</li>
+			<li>load time – more about FE, assets, network, caching, etc.</li>
+			<li>runtime – everything that happens after load time</li>
+			<li>there are common things between RT and LT perf</li>
+			<li>Animations / gamedev are about rendering – not my specialty</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Load time performance</h1>
+
+	<ul>
+		<li><a href="https://developers.google.com/web/fundamentals/performance/user-centric-performance-metrics#user-centric_performance_metrics">User-centric performance metrics</a></li>
+		<li>First paint, First contentful paint, first meaningful pain, time to interactive, <a href="https://developers.google.com/web/fundamentals/performance/critical-rendering-path/analyzing-crp">critical rendering path</a></li>
+		<li>Network optimization (HTTP2, minification)</li>
+		<li><abbr title="Progressive web app">PWA</abbr>, AMP, etc.</li>
+		<li>and a lot more...</li>
+
+	<aside class="notes">
+		<ul>
+			<li>quickly about it...</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Optimizing</h1>
+
+	<p>When? What? How?</p>
+
+	<aside class="notes">
+		<ul>
+			<li></li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1><em>When</em> should you optimize?</h1>
+
+	<h2 class="fragment">When it matters</h2>
+
+	<aside class="notes">
+		<ul>
+			<li>when there's a problem</li>
+			<li>that should be quite obvious, but...</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Premature optimization is the root of all evil</h1>
+
+	<aside class="notes">
+		<ul>
+			<li>developers like challenges (and overthink stuff)</li>
+			<li>complexity</li>
+			<li>bugs</li>
+			<li>your time – (the most?) precious resource</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1><em>When</em> does performance matter?</h1>
+
+	<h2 class="fragment">When the user is really affected</h2>
+
+	<p class="fragment">on their device</p>
+	<p class="fragment">with their data</p>
+
+	<aside class="notes">
+		<ul>
+			<li>so when do you have a problem?</li>
+			<li>when the user sees/feels it</li>
+			<li>UX, responsiveness, smooth exp</li>
+			<li>be realistic! user's network/device/amount of data</li>
+			<li>see through your user's eyes</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1><em>When</em> should you think about performance?</h1>
+
+	<ul>
+		<li class="fragment">post factum – when you have problems</li>
+		<li class="fragment">a priori – when you <strong>know</strong> you'll have problems</li>
+		<li class="fragment">a priori – when you make architecture decisions</li>
+		<li class="fragment">at all other times</li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li>when you need to fix existing issues</li>
+			<li>critical code, complex apps, loads of data</li>
+			<li>architecture == things that are hard to change</li>
+			<li>think != do</li>
+			<li>avoid doing really bad things</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1><em>What</em> should you optimize?</h1>
+
+	<h2 class="fragment">What matters<br><span class="fragment">& what can be improved</span></h2>
+
+	<aside class="notes">
+		<ul>
+			<li>some optimizations won't make a (big) difference</li>
+			<li>and some things cannot be optimized (in finite time)</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1><em>What</em> should you optimize?</h1>
+
+	<ul>
+		<li class="fragment">look for things that <strong>take the longest</strong></li>
+		<li class="fragment">look for things which <strong>block other things</strong></li>
+		<li class="fragment">look for things which <strong>happen too often</strong></li>
+		<li class="fragment">dev tools underline some mistakes</li>
+		<li class="fragment">gut feeling</li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li>so, what's that?</li>
+			<li>if you cut 50% of a thing which takes 2s, you gain 1s</li>
+			<li>if you cut 50% of a thing which takes 0.2s, you gain 0.1s</li>
+			<li>listen to your intuition</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1><em>How</em> <strong>not</strong> to optimize?</h1>
+
+	<ul>
+		<li class="fragment">Unjustified micro optimizations</li>
+		<li class="fragment">When it's too risky (no tests? complexity?)</li>
+		<li class="fragment">Again, prematurely</li>
+		<li class="fragment">Again, when there's no chance</li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li>no, the type of for loop does not matter</li>
+			<li>ROI and risks – e.g. too complex change may break your system; broken system is worse than slow system</li>
+			<li>when I worked on Toby, I used an example from GDevs just because they use it, turned out it had catastrophic impact on my code</li>
+			<li>cache</li>
+			<li>diff vs fastDiff example</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>So, <em>how</em> should you optimize?</h1>
+
+	<ul style="font-size: 75%">
+		<li class="fragment">start locally, think broadly</li>
+		<li class="fragment">know the code</li>
+		<li class="fragment">find the root cause</li>
+		<li class="fragment">avoid noise, keep your env tidy</li>
+		<li class="fragment">follow your gut feeling</li>
+		<li class="fragment">but verify your hypothesis (realistically!)</li>
+		<li class="fragment">be creative</li>
+		<li class="fragment">but avoid complexity</li>
+		<li class="fragment">don't fixate on one thing</li>
+		<li class="fragment">and know when to stop</li>
+		<li class="fragment">bonus: question self-proclaimed experts</li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li>finally, we get to how...</li>
+			<li>a couple of general remarks before we'll move to the practical session</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Memory leaks</h1>
+
+	<aside class="notes">
+		<ul>
+			<li>let's start from memory leaks because they are (usually) simpler</li>
+			<li>they affect performance too</li>
+			<li>and we'll have a chance to learn a bit about Toby</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Garbage collector</h1>
+
+	<h2><a href="https://blog.sessionstack.com/how-javascript-works-memory-management-how-to-handle-4-common-memory-leaks-3f28b94cfbec#f98a">Mark & sweep algorithm</a></h2>
+
+	<ol>
+		<li class="fragment">
+			Find unreachable objects
+			<small>i.e. objects which cannot be accessed starting from a GC root</small>
+		</li>
+		<li class="fragment">
+			Remove them from the memory
+		</li>
+	</ol>
+
+	<aside class="notes">
+		<ul>
+			<li>first, we need to understand how memory is managed in JS</li>
+			<li>https://blog.sessionstack.com/how-javascript-works-memory-management-how-to-handle-4-common-memory-leaks-3f28b94cfbec</li>
+			<li>note: in the past two object referencing each other were causing issues... should not be a problem any more but I still found this on MDN</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Can we free it?</h1>
+
+	<pre><code class="js">
+{
+	const foo = [];
+
+	document.body.addEventListener( 'click', () => {
+		console.log( 'hello!' );
+	} );
+
+	console.log( foo );
+}
+	</code></pre>
+
+	<aside class="notes">
+		<ul>
+			<li>yes, foo is not needed after console.log() is executed</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Can we free it?</h1>
+
+	<pre><code class="js">
+{
+	const foo = [];
+
+	document.body.addEventListener( 'click', () => {
+		console.log( foo );
+	} );
+
+	console.log( foo );
+}
+	</code></pre>
+
+	<aside class="notes">
+		<ul>
+			<li>no, foo is used in a listener reachable from the GC root</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Can we free it?</h1>
+
+	<pre><code class="js">
+{
+	const foo = [];
+	const span = document.createElement( 'span' );
+
+	span.addEventListener( 'click', () => {
+		console.log( foo );
+	} );
+
+	console.log( foo );
+}
+	</code></pre>
+
+	<aside class="notes">
+		<ul>
+			<li>yes, both foo and span are local variables, so even though foo is used in a listener, this listener is not reachable from a GC root</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Can we free it?</h1>
+
+	<pre><code class="html">
+&lt;script>
+	foo = [];
+	span = document.createElement( 'span' );
+
+	span.addEventListener( 'click', () => {
+		console.log( foo );
+	} );
+
+	console.log( foo );
+&lt;/script>
+	</code></pre>
+
+	<aside class="notes">
+		<ul>
+			<li>no, this is a bad code which creates two global variables (foo and span)</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Garbage collector</h1>
+
+	<ul>
+		<li>Implemented by the browsers</li>
+		<li>Browsers make decisions when to run it</li>
+		<li>GC pauses (it's synchronous)</li>
+		<li>Minor GC, major GC, DOM GC</li>
+		<li>Can be expensive</li>
+		<li>Differs between browsers, changes with time</li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li>it's synchronous, execution of your script is paused</li>
+			<li>young generation, old generation</li>
+			<li>those pauses can be noticeable (usually are when talking about animations/games)</li>
+			<li>browser devs push super hard – different implementations, complex heuristics (and change with time)</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>When does memory leak?</h1>
+
+	<ul>
+		<li class="fragment">leaked globals</li>
+		<li class="fragment">globals referring to your objects</li>
+		<li class="fragment">listeners on globals (and objects referenced by globals)</li>
+		<li class="fragment">timeouts/intervals</li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li>and so on...</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Demo time!</h1>
+
+	<ul>
+		<li><a href="/warsawjs-workshop-30-spreadsheet/samples/test-memory-1.html">Globals</a></li>
+		<li><a href="/warsawjs-workshop-30-spreadsheet/samples/test-memory-2.html">Listeners</a></li>
+		<li><a href="/warsawjs-workshop-30-spreadsheet/samples/test-memory-3.html">Timeouts</a></li>
+		<li><a href="/warsawjs-workshop-30-spreadsheet/samples/test-memory-4.html">DOM nodes</a></li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li>tools: memory tab, heap, allocation timeline, allocation sampling, performance monitor, performance tab</li>
+			<li>look for references to your source code</li>
+			<li>look for Detached*</li>
+			<li>look for (closure)</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Anecdote</h1>
+
+	<pre><code class="js">
+class MyApp {
+	// ... lots of code here
+
+	destroy() {
+		// Deallocating memory...
+		this.foo = null;
+		this.bar = null;
+		this.boom = null;
+	}
+}
+	</code></pre>
+
+	<aside class="notes">
+		<ul>
+			<li>by a seasoned developer</li>
+			<li>should not be needed (because if an instance of MyApp is correctly unreferenced, then those properties will not be retained)</li>
+			<li>may actually make finding issues harder</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Let's fix <a href="/warsawjs-workshop-30-spreadsheet/">Toby</a>!</h1>
+
+	<p>Test:</p>
+
+	<ul>
+		<li>Scrolling</li>
+		<li>Using and destroying the app</li>
+		<li>Init & destroy</li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li></li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Runtime performance</h1>
+
+	<ul>
+		<li>Scripting</li>
+		<li>Styles, layout</li>
+		<li>Painting</li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li>the scope is huge</li>
+			<li>we'll cover very briefly the most common (in my experience) issues and techniques</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Your goal</h1>
+
+	<ul>
+		<li>responsive and smooth experience</li>
+		<li class="fragment">ideally 60FPS</li>
+		<li class="fragment">1000ms / 60 = 16.6ms per frame</li>
+		<li class="fragment">script + styles + layout + paint</li>
+		<li class="fragment"><a href="https://ckeditor.com/ckeditor-5/demo/">but it's not a rule</a></li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li></li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Know your enemy</h1>
+
+	<ul>
+		<li>Browser mechanisms</li>
+		<li>Common issues</li>
+		<li>Common techniques</li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li>the following list is really random</li>
+			<li>just stuff that came to my mind that I think you should know</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>JavaScript</h1>
+
+	<ul style="font-size: 90%">
+		<li>JS is single-threaded (the rest not necessarily)</li>
+		<li><a href="https://www.youtube.com/watch?v=8aGhZQkoFbQ">event loop</a></li>
+		<li><a href="https://www.youtube.com/watch?v=p-iiEDtpy6I"><abbr title="Just in Time">JIT</abbr> compilation</a> – avoid deopts</li>
+		<li>Cache / <a href="https://en.wikipedia.org/wiki/Memoization">memoization</a></li>
+		<li>Web Workers</li>
+		<li>RegExp can be super slow (e.g. <a href="https://www.regular-expressions.info/catastrophic.html">catastrophic backtracing</a>, non-capturing groups)</li>
+		<li>You can benchmark your code, but keep it realistic</li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li></li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>DOM</h1>
+
+	<ul style="font-size: 90%">
+		<li><a href="https://gist.github.com/paulirish/5d52fb081b3570c81e3a">Avoid layout trashing</a></li>
+		<li>Batch DOM changes</li>
+		<li><a href="https://developer.mozilla.org/en-US/docs/Web/API/DocumentFragment">DocumentFragment</a>s</li>
+		<li>Use less elements (keep DOM clean) and listeners (e.g. via <a href="https://davidwalsh.name/event-delegate">event delegation</a>)</li>
+		<li>Recycle elements</li>
+		<li>Clone elements</li>
+		<li>Avoid pitfalls like setting <code>innerHTML</code></li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li>https://github.com/wilsonpage/fastdom</li>
+			<li>https://stackoverflow.com/questions/14203196/does-using-a-document-fragment-really-improve-performance – old but still true</li>
+			<li>innerText and textContent</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Memory</h1>
+
+	<ul>
+		<li>Avoid major GC pauses</li>
+		<li>Less allocations</li>
+		<li>Recycle objects</li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li>https://stackoverflow.com/questions/18364175/best-practices-for-reducing-garbage-collector-activity-in-javascript</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Keep it smooth</h1>
+
+	<ul style="font-size: 90%">
+		<li>Aim for short sync chunks</li>
+		<li>Reduce paint time – promote things which change frequently to layers</li>
+		<li>Reduce layer management time (updating layer tree and compositing layers)</li>
+		<li><code>requestAnimationFrame()</code></li>
+		<li>Split long chunks with timeouts or <abbr title="requestAnimationFrame">rAF</abbr></li>
+		<li>Delay non-critical stuff (sync -> async execution)</li>
+		<li>Do stuff less often – <a href="https://css-tricks.com/debouncing-throttling-explained-examples/">throttling, debouncing</a></li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li>https://www.html5rocks.com/en/tutorials/speed/layers/</li>
+			<li>https://developers.google.com/web/fundamentals/performance/rendering/</li>
+			<li>https://css-tricks.com/the-difference-between-throttling-and-debouncing/</li>
+			<li>https://stackoverflow.com/questions/38709923/why-is-requestanimationframe-better-than-setinterval-or-settimeout</li>
+			<li>https://medium.com/@paul_irish/requestanimationframe-scheduling-for-nerds-9c57f7438ef4</li>
+			<li>https://css-tricks.com/myth-busting-css-animations-vs-javascript/</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Demo time!</h1>
+
+	<ul>
+		<li><a href="/warsawjs-workshop-30-spreadsheet/samples/test-performance-1.html">Profiling rendering</a></li>
+		<li><a href="/warsawjs-workshop-30-spreadsheet/samples/test-performance-2.html">CPU hogging, JIT, deopts</a></li>
+		<li><a href="/warsawjs-workshop-30-spreadsheet/samples/test-performance-3.html">setTimeout vs rAF</a></li>
+		<li><a href="/warsawjs-workshop-30-spreadsheet/samples/test-performance-4.html">GS pauses</a></li>
+		<li><a href="/warsawjs-workshop-30-spreadsheet/samples/test-performance-5.html">layout trashing</a></li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li>TODO: stuff in the profiler too show</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Let's improve <a href="/warsawjs-workshop-30-spreadsheet/">Toby</a>!</h1>
+
+	<p style="font-size: 70%; font-style: italic">Note: You can append #0, #1, #2 to the URL to get different data sets. The #* below indicate in which sample which technique is best visible.</p>
+
+	<ul style="font-size: 70%">
+		<li>cache/memoization #2</li>
+		<li>web workers #2</li>
+		<li>delay non-critical stuff #2</li>
+		<li>batch DOM changes #1</li>
+		<li>clone elements #1</li>
+		<li>recycle elements #1</li>
+		<li>avoid pitfalls like setting innerHTML #*</li>
+		<li>requestAnimationFrame #*</li>
+		<li>throttling #*</li>
+	</ul>
+
+	<aside class="notes">
+		<ul>
+			<li>#0 – default data set – 38 columns, no formulas</li>
+			<li>#1 – huge data set – 380 columns, no formulas, note: we show only the first 38 columns, while the other 342 are hidden via CSS (but still present in the DOM)</li>
+			<li>#2 – less columns, two complex formulas</li>
+			<li>Toby implements an infinite scroller – read more about this technique on https://developers.google.com/web/updates/2016/07/infinite-scroller</li>
+		</ul>
+	</aside>
+</section>
+
+<section>
+	<h1>Thank you!</h1>
+
+	<aside class="notes">
+		<ul>
+			<li></li>
+		</ul>
+	</aside>
+</section>
+
+			</div>
+		</div>
+
+		<script src="lib/js/head.min.js"></script>
+		<script src="js/reveal.js"></script>
+
+		<script>
+			// More info about config & dependencies:
+			// - https://github.com/hakimel/reveal.js#configuration
+			// - https://github.com/hakimel/reveal.js#dependencies
+			Reveal.initialize( {
+				history: true,
+
+				dependencies: [
+					{ src: 'plugin/markdown/marked.js' },
+					{ src: 'plugin/markdown/markdown.js' },
+					{ src: 'plugin/notes/notes.js', async: true },
+					{ src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }
+				]
+			} );
+
+			document.body.addEventListener( 'keydown', ( evt ) => {
+				if ( evt.key == 'q' ) {
+					document.body.classList.toggle( 'show-notes-inline' );
+				}
+			} );
+		</script>
+	</body>
+</html>
